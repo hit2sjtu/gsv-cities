@@ -26,12 +26,12 @@ def get_backbone(backbone_arch='resnet50',
             return backbones.EfficientNet(backbone_arch, pretrained, layers_to_freeze+2)
         else:
             return backbones.EfficientNet(model_name='efficientnet_b0',
-                                          pretrained=pretrained, 
+                                          pretrained=pretrained,
                                           layers_to_freeze=layers_to_freeze)
-            
+
     elif 'swin' in backbone_arch.lower():
-        return backbones.Swin(model_name='swinv2_base_window12to16_192to256_22kft1k', 
-                              pretrained=pretrained, 
+        return backbones.Swin(model_name='swinv2_base_window12to16_192to256_22kft1k',
+                              pretrained=pretrained,
                               layers_to_freeze=layers_to_freeze)
 
 def get_aggregator(agg_arch='ConvAP', agg_config={}):
@@ -46,7 +46,7 @@ def get_aggregator(agg_arch='ConvAP', agg_config={}):
     Returns:
         nn.Module: the aggregation layer
     """
-    
+
     if 'cosplace' in agg_arch.lower():
         assert 'in_dim' in agg_config
         assert 'out_dim' in agg_config
@@ -58,12 +58,14 @@ def get_aggregator(agg_arch='ConvAP', agg_config={}):
         else:
             assert 'p' in agg_config
         return aggregators.GeMPool(**agg_config)
-    
+
     elif 'convap' in agg_arch.lower():
         assert 'in_channels' in agg_config
         return aggregators.ConvAP(**agg_config)
 
-
+    elif 'boq' in agg_arch.lower():
+        #assert 'in_channels' in agg_config
+        return aggregators.BoQ(**agg_config)
 
 
 
@@ -77,11 +79,11 @@ def print_nb_params(m):
     model_parameters = filter(lambda p: p.requires_grad, m.parameters())
     params = sum([np.prod(p.size()) for p in model_parameters])
     print(f'Trainable parameters: {params/1e6:.3}M')
-    
-    
+
+
 def main():
     import torch
-    
+
     x = torch.randn(1, 3, 224, 224) #random image
     # backbone = get_backbone(backbone_arch='resnet50')
     backbone = get_backbone(backbone_arch='resnet50')
@@ -89,10 +91,10 @@ def main():
     # agg = get_aggregator('GeM')
     print_nb_params(backbone)
     print_nb_params(agg)
-    
+
     backbone_output = backbone(x)
     agg_output = agg(backbone_output)
     print(f'output shape: {agg_output.shape}')
-    
+
 if __name__ == '__main__':
     main()

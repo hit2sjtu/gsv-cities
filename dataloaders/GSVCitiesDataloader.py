@@ -4,17 +4,17 @@ from torchvision import transforms as T
 
 from dataloaders.train.GSVCitiesDataset import GSVCitiesDataset
 from dataloaders.val.PittsburghDataset import PittsburghDataset
-from dataloaders.val.MapillaryDataset import MSLS
-from dataloaders.val.NordlandDataset import NordlandDataset
-from dataloaders.val.SPEDDataset import SPEDDataset
+#from dataloaders.val.MapillaryDataset import MSLS
+#from dataloaders.val.NordlandDataset import NordlandDataset
+#from dataloaders.val.SPEDDataset import SPEDDataset
 
 
 from prettytable import PrettyTable
 
-IMAGENET_MEAN_STD = {'mean': [0.485, 0.456, 0.406], 
+IMAGENET_MEAN_STD = {'mean': [0.485, 0.456, 0.406],
                      'std': [0.229, 0.224, 0.225]}
 
-VIT_MEAN_STD = {'mean': [0.5, 0.5, 0.5], 
+VIT_MEAN_STD = {'mean': [0.5, 0.5, 0.5],
                 'std': [0.5, 0.5, 0.5]}
 
 TRAIN_CITIES = [
