@@ -226,13 +226,13 @@ if __name__ == '__main__':
     # if you want to train on specific cities, you can comment/uncomment
     # cities from the list TRAIN_CITIES
     datamodule = GSVCitiesDataModule(
-        batch_size=60,
+        batch_size=90,
         img_per_place=4,
         min_img_per_place=4,
         # cities=['London', 'Boston', 'Melbourne'], # you can sppecify cities here or in GSVCitiesDataloader.py
         shuffle_all=False, # shuffle all images or keep shuffling in-city only
         random_sample_from_each_place=True,
-        image_size=(320, 320),
+        image_size=(224, 224),
         num_workers=8,
         show_data_stats=True,
         val_set_names=['pitts30k_val'], # pitts30k_val, pitts30k_test, msls_val, nordland, sped
@@ -246,11 +246,13 @@ if __name__ == '__main__':
     model = VPRModel(
         #-------------------------------
         #---- Backbone architecture ----
-        backbone_arch='resnet50',
-        pretrained=True,
-        layers_to_freeze=2,
-        layers_to_crop=[4], # 4 crops the last resnet layer, 3 crops the 3rd, ...etc
+        #if False:
+        ##    backbone_arch='resnet50',
+        #    pretrained=True,
+        #    layers_to_freeze=2,
+        #    layers_to_crop=[4], # 4 crops the last resnet layer, 3 crops the 3rd, ...etc
 
+        backbone_arch='dinov2_vitb14',
         #---------------------
         #---- Aggregator -----
         # agg_arch='CosPlace',
@@ -260,7 +262,7 @@ if __name__ == '__main__':
         # agg_config={'p': 3},
 
         agg_arch='BoQ',
-        agg_config={'in_channels':1024,
+        agg_config={'in_channels':768,
          'proj_channels':512
         },
 
@@ -299,6 +301,8 @@ if __name__ == '__main__':
         mode='max',)
 
 
+    #msg = model.load_state_dict(torch.load('/media/GSV_CITIES/gsv-cities/LOGS/resnet50/lightning_logs/version_1/checkpoints/1.ckpt')['state_dict'], strict=True)
+    #print(msg)
     #------------------
     # we instanciate a trainer
     trainer = pl.Trainer(
@@ -306,8 +310,8 @@ if __name__ == '__main__':
         default_root_dir=f'./LOGS/{model.encoder_arch}', # Tensorflow can be used to viz
 
         num_sanity_val_steps=0, # runs N validation steps before stating training
-        precision=32, # we use half precision to reduce  memory usage (and 2x speed on RTX)
-        max_epochs=1,
+        precision=16, # we use half precision to reduce  memory usage (and 2x speed on RTX)
+        max_epochs=10,
         check_val_every_n_epoch=1, # run validation every epoch
         callbacks=[checkpoint_cb],# we run the checkpointing callback (you can add more)
         reload_dataloaders_every_n_epochs=1, # we reload the dataset to shuffle the order

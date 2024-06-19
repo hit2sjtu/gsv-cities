@@ -33,7 +33,8 @@ def get_backbone(backbone_arch='resnet50',
         return backbones.Swin(model_name='swinv2_base_window12to16_192to256_22kft1k',
                               pretrained=pretrained,
                               layers_to_freeze=layers_to_freeze)
-
+    elif 'dino' in backbone_arch.lower():
+        return backbones.DINOv2()
 def get_aggregator(agg_arch='ConvAP', agg_config={}):
     """Helper function that returns the aggregation layer given its name.
     If you happen to make your own aggregator, you might need to add a call
