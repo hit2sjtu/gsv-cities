@@ -22,7 +22,7 @@ class DINOv2(nn.Module):
     def __init__(
             self,
             model_name='dinov2_vitb14',
-            num_trainable_blocks=2,
+            num_trainable_blocks=1,
             norm_layer=True,
             return_token=False
         ):
