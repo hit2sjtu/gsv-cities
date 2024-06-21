@@ -72,6 +72,7 @@ class VPRModel(pl.LightningModule):
         # get the backbone and the aggregator
         self.backbone = helper.get_backbone(backbone_arch, pretrained, layers_to_freeze, layers_to_crop)
         self.aggregator = helper.get_aggregator(agg_arch, agg_config)
+        self.validation_step_outputs = []
 
     # the forward pass of the lightning model
     def forward(self, x):
@@ -101,8 +102,8 @@ class VPRModel(pl.LightningModule):
 
     # configure the optizer step, takes into account the warmup stage
     def optimizer_step(self,  epoch, batch_idx,
-                        optimizer, optimizer_idx, optimizer_closure,
-                        on_tpu, using_native_amp, using_lbfgs):
+                        optimizer, optimizer_closure
+                        ):
         # warm up lr
         if self.trainer.global_step < self.warmpup_steps:
             lr_scale = min(1., float(self.trainer.global_step + 1) / self.warmpup_steps)
@@ -161,7 +162,7 @@ class VPRModel(pl.LightningModule):
         return {'loss': loss}
 
     # This is called at the end of eatch training epoch
-    def training_epoch_end(self, training_step_outputs):
+    def on_training_epoch_end(self):
         # we empty the batch_acc list for next epoch
         self.batch_acc = []
 
@@ -171,9 +172,11 @@ class VPRModel(pl.LightningModule):
         places, _ = batch
         # calculate descriptors
         descriptors = self(places)
+        self.validation_step_outputs.append(descriptors.detach().cpu())
         return descriptors.detach().cpu()
 
-    def validation_epoch_end(self, val_step_outputs):
+#    def on_validation_epoch_end(self, val_step_outputs):
+    def on_validation_epoch_end(self):
         """at the end of each validation epoch
         descriptors are returned in their order
         depending on how the validation dataset is implemented
@@ -188,10 +191,10 @@ class VPRModel(pl.LightningModule):
         # The following line is a hack: if we have only one validation set, then
         # we need to put the outputs in a list (Pytorch Lightning does not do it presently)
         if len(dm.val_datasets)==1: # we need to put the outputs in a list
-            val_step_outputs = [val_step_outputs]
+            self.validation_step_outputs = [self.validation_step_outputs]
 
         for i, (val_set_name, val_dataset) in enumerate(zip(dm.val_set_names, dm.val_datasets)):
-            feats = torch.concat(val_step_outputs[i], dim=0)
+            feats = torch.concat(self.validation_step_outputs[i], dim=0)
 
             num_references = val_dataset.num_references
             num_queries = val_dataset.num_queries
@@ -219,20 +222,20 @@ class VPRModel(pl.LightningModule):
 
 if __name__ == '__main__':
 
-    pl.utilities.seed.seed_everything(seed=1, workers=True)
+    #pl.utilities.seed.seed_everything(seed=1, workers=True)
 
     # the datamodule contains train and validation dataloaders,
     # refer to ./dataloader/GSVCitiesDataloader.py for details
     # if you want to train on specific cities, you can comment/uncomment
     # cities from the list TRAIN_CITIES
     datamodule = GSVCitiesDataModule(
-        batch_size=90,
+        batch_size=150,
         img_per_place=4,
         min_img_per_place=4,
         # cities=['London', 'Boston', 'Melbourne'], # you can sppecify cities here or in GSVCitiesDataloader.py
         shuffle_all=False, # shuffle all images or keep shuffling in-city only
         random_sample_from_each_place=True,
-        image_size=(224, 224),
+        image_size=(280, 280),
         num_workers=8,
         show_data_stats=True,
         val_set_names=['pitts30k_val'], # pitts30k_val, pitts30k_test, msls_val, nordland, sped
@@ -301,7 +304,7 @@ if __name__ == '__main__':
         mode='max',)
 
 
-    #msg = model.load_state_dict(torch.load('/media/GSV_CITIES/gsv-cities/LOGS/resnet50/lightning_logs/version_1/checkpoints/1.ckpt')['state_dict'], strict=True)
+    #msg = model.load_state_dict(torch.load('/media/GSV_CITIES/gsv-cities/LOGS/dinov2_vitb14/lightning_logs/bs120_280_freeze1/checkpoints/dinov2_vitb14_epoch(00)_step(0521)_R1[0.9360]_R5[0.9883].ckpt')['state_dict'], strict=True)
     #print(msg)
     #------------------
     # we instanciate a trainer
