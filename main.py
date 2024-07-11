@@ -230,7 +230,7 @@ if __name__ == '__main__':
     # if you want to train on specific cities, you can comment/uncomment
     # cities from the list TRAIN_CITIES
     datamodule = GSVCitiesDataModule(
-        batch_size=120,
+        batch_size=160,
         img_per_place=4,
         min_img_per_place=4,
         # cities=['London', 'Boston', 'Melbourne'], # you can sppecify cities here or in GSVCitiesDataloader.py
@@ -265,7 +265,7 @@ if __name__ == '__main__':
         optimizer='adamw', # sgd, adam or adamw
         weight_decay=0, # 0.001 for sgd or 0.0 for adam
         momentum=0.9,
-        warmpup_steps=5200,
+        warmpup_steps=3790,
         milestones=[10, 20, 30],
         lr_mult=0.1,
 
