@@ -217,6 +217,7 @@ class VPRModel(pl.LightningModule):
             self.log(f'{val_set_name}/R1', recalls_dict[1], prog_bar=False, logger=True)
             self.log(f'{val_set_name}/R5', recalls_dict[5], prog_bar=False, logger=True)
             self.log(f'{val_set_name}/R10', recalls_dict[10], prog_bar=False, logger=True)
+        self.validation_step_outputs = []
         print('\n\n')
 
 
