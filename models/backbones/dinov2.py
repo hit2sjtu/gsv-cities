@@ -1,84 +1,105 @@
 import torch
-import torch.nn as nn
+import torchvision
 
-DINOV2_ARCHS = {
-    'dinov2_vits14': 384,
-    'dinov2_vitb14': 768,
-    'dinov2_vitl14': 1024,
-    'dinov2_vitg14': 1536,
-}
-
-class DINOv2(nn.Module):
-    """
-    DINOv2 model
-
-    Args:
-        model_name (str): The name of the model architecture
-            should be one of ('dinov2_vits14', 'dinov2_vitb14', 'dinov2_vitl14', 'dinov2_vitg14')
-        num_trainable_blocks (int): The number of last blocks in the model that are trainable.
-        norm_layer (bool): If True, a normalization layer is applied in the forward pass.
-        return_token (bool): If True, the forward pass returns both the feature map and the token.
-    """
+class ResNet(torch.nn.Module):
     def __init__(
-            self,
-            model_name='dinov2_vitb14',
-            num_trainable_blocks=1,
-            norm_layer=True,
-            return_token=False
-        ):
+        self,
+        backbone_name="resnet50",
+        crop_last_block=True,
+    ):
         super().__init__()
 
-        assert model_name in DINOV2_ARCHS.keys(), f'Unknown model name {model_name}'
-        try:
-            self.model = torch.hub.load('facebookresearch/dinov2', model_name)
-        except:
-            import os
-            self.model = torch.hub.load(os.environ['HOME'] + '/.cache/torch/hub/facebookresearch_dinov2_main', model_name, source='local')
-        else:
-            print('load model from torch hub successfully')
-        finally:
-            print('load model successfully')
-        self.num_channels = DINOV2_ARCHS[model_name]
-        self.num_trainable_blocks = num_trainable_blocks
-        self.norm_layer = norm_layer
-        self.return_token = return_token
+        self.crop_last_block = crop_last_block
 
+
+        if "18" in backbone_name:
+            model = torchvision.models.resnet18()
+        elif "34" in backbone_name:
+            model = torchvision.models.resnet34()
+        elif "50" in backbone_name:
+            model = torchvision.models.resnet50()
+        elif "101" in backbone_name:
+            model = torchvision.models.resnet101()
+        else:
+            raise NotImplementedError("Backbone architecture not recognized!")
+
+
+        # create backbone with only the necessary layers
+        self.net = torch.nn.Sequential(
+            model.conv1,
+            model.bn1,
+            model.relu,
+            model.maxpool,
+            model.layer1,
+            model.layer2,
+            model.layer3,
+            *([] if crop_last_block else [model.layer4]),
+        )
+
+        # calculate output channels
+        out_channels = 2048
+        if "34" in backbone_name or "18" in backbone_name:
+            out_channels = 512
+
+        self.out_channels = out_channels // 2 if crop_last_block else out_channels
 
     def forward(self, x):
-        """
-        The forward method for the DINOv2 class
+        x = self.net(x)
+        return x
 
-        Parameters:
-            x (torch.Tensor): The input tensor [B, 3, H, W]. H and W should be divisible by 14.
+class DinoV2(torch.nn.Module):
+    AVAILABLE_MODELS = [
+        'dinov2_vits14',
+        'dinov2_vitb14',
+        'dinov2_vitl14',
+        'dinov2_vitg14'
+    ]
 
-        Returns:
-            f (torch.Tensor): The feature map [B, C, H // 14, W // 14].
-            t (torch.Tensor): The token [B, C]. This is only returned if return_token is True.
-        """
+    def __init__(
+        self,
+        backbone_name="dinov2_vitb14",
+        num_unfrozen_blocks=2,
+    ):
+        super().__init__()
 
-        B, C, H, W = x.shape
+        self.backbone_name = backbone_name
+        self.num_unfrozen_blocks = num_unfrozen_blocks
 
-        x = self.model.prepare_tokens_with_masks(x)
+        # make sure the backbone_name is in the available models
+        if self.backbone_name not in self.AVAILABLE_MODELS:
+            raise ValueError(f"Backbone {self.backbone_name} is not recognized!"
+                             f"Supported backbones are: {self.AVAILABLE_MODELS}")
 
-        # First blocks are frozen
+
+        self.dino = torch.hub.load('facebookresearch/dinov2', self.backbone_name)
+
+        # freeze the patch embedding and positional encoding
+        self.dino.patch_embed.requires_grad_(False)
+        self.dino.pos_embed.requires_grad_(False)
+
+        # freeze the first blocks, keep only the last num_unfrozen_blocks trainable
+        for i in range(len(self.dino.blocks) - self.num_unfrozen_blocks):
+            self.dino.blocks[i].requires_grad_(False)
+
+        self.out_channels = self.dino.embed_dim
+
+    def forward(self, x):
+        B, _, H, W = x.shape
+        # No need to compute gradients for frozen layers
         with torch.no_grad():
-            for blk in self.model.blocks[:-self.num_trainable_blocks]:
+            x = self.dino.prepare_tokens_with_masks(x)
+            for blk in self.dino.blocks[ : -self.num_unfrozen_blocks]:
                 x = blk(x)
         x = x.detach()
 
         # Last blocks are trained
-        for blk in self.model.blocks[-self.num_trainable_blocks:]:
+        for blk in self.dino.blocks[-self.num_unfrozen_blocks : ]:
             x = blk(x)
 
-        if self.norm_layer:
-            x = self.model.norm(x)
 
-        t = x[:, 0]
-        f = x[:, 1:]
+        x = x[:, 1:] # remove the [CLS] token
 
-        # Reshape to (B, C, H, W)
-        f = f.reshape((B, H // 14, W // 14, self.num_channels)).permute(0, 3, 1, 2)
-
-        if self.return_token:
-            return f, t
-        return f
+        # reshape the output tensor to B, C, H, W
+        _, _, C = x.shape # we know C == self.dino.embed_dim, but still...
+        x = x.permute(0, 2, 1).contiguous().view(B, C, H//14, W//14)
+        return x

@@ -229,7 +229,7 @@ if __name__ == '__main__':
     # if you want to train on specific cities, you can comment/uncomment
     # cities from the list TRAIN_CITIES
     datamodule = GSVCitiesDataModule(
-        batch_size=150,
+        batch_size=120,
         img_per_place=4,
         min_img_per_place=4,
         # cities=['London', 'Boston', 'Melbourne'], # you can sppecify cities here or in GSVCitiesDataloader.py
@@ -247,38 +247,26 @@ if __name__ == '__main__':
     # efficientnet_b0, efficientnet_b1, efficientnet_b2
     # swinv2_base_window12to16_192to256_22kft1k
     model = VPRModel(
-        #-------------------------------
-        #---- Backbone architecture ----
-        #if False:
-        ##    backbone_arch='resnet50',
-        #    pretrained=True,
-        #    layers_to_freeze=2,
-        #    layers_to_crop=[4], # 4 crops the last resnet layer, 3 crops the 3rd, ...etc
-
         backbone_arch='dinov2_vitb14',
-        #---------------------
-        #---- Aggregator -----
-        # agg_arch='CosPlace',
-        # agg_config={'in_dim': 512,
-        #             'out_dim': 512},
-        # agg_arch='GeM',
-        # agg_config={'p': 3},
-
         agg_arch='BoQ',
-        agg_config={'in_channels':768,
-         'proj_channels':512
+        agg_config={
+            "in_channels":768,  # make sure the backbone has out_channels attribute
+            "proj_channels":384,
+            "num_queries":64,
+            "num_layers":2,
+            "row_dim":32, # the output dimension will be poj_channels*row_dim
         },
 
         #-----------------------------------
         #---- Training hyperparameters -----
         #
         lr=0.0002, # 0.03 for sgd
-        optimizer='adam', # sgd, adam or adamw
+        optimizer='adamw', # sgd, adam or adamw
         weight_decay=0, # 0.001 for sgd or 0.0 for adam
         momentum=0.9,
-        warmpup_steps=600,
+        warmpup_steps=5200,
         milestones=[10, 20, 30],
-        lr_mult=0.3,
+        lr_mult=0.1,
 
         #---------------------------------
         #---- Training loss function -----
@@ -300,12 +288,9 @@ if __name__ == '__main__':
         '_epoch({epoch:02d})_step({step:04d})_R1[{pitts30k_val/R1:.4f}]_R5[{pitts30k_val/R5:.4f}]',
         auto_insert_metric_name=False,
         save_weights_only=True,
-        save_top_k=3,
+        save_top_k=5,
         mode='max',)
 
-
-    #msg = model.load_state_dict(torch.load('/media/GSV_CITIES/gsv-cities/LOGS/dinov2_vitb14/lightning_logs/bs120_280_freeze1/checkpoints/dinov2_vitb14_epoch(00)_step(0521)_R1[0.9360]_R5[0.9883].ckpt')['state_dict'], strict=True)
-    #print(msg)
     #------------------
     # we instanciate a trainer
     trainer = pl.Trainer(
@@ -313,7 +298,7 @@ if __name__ == '__main__':
         default_root_dir=f'./LOGS/{model.encoder_arch}', # Tensorflow can be used to viz
 
         num_sanity_val_steps=0, # runs N validation steps before stating training
-        precision=32, # we use half precision to reduce  memory usage (and 2x speed on RTX)
+        precision='16-mixed', # we use half precision to reduce  memory usage (and 2x speed on RTX)
         max_epochs=40,
         check_val_every_n_epoch=1, # run validation every epoch
         callbacks=[checkpoint_cb],# we run the checkpointing callback (you can add more)

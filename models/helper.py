@@ -34,7 +34,7 @@ def get_backbone(backbone_arch='resnet50',
                               pretrained=pretrained,
                               layers_to_freeze=layers_to_freeze)
     elif 'dino' in backbone_arch.lower():
-        return backbones.DINOv2()
+        return backbones.DinoV2()
 def get_aggregator(agg_arch='ConvAP', agg_config={}):
     """Helper function that returns the aggregation layer given its name.
     If you happen to make your own aggregator, you might need to add a call
@@ -65,7 +65,6 @@ def get_aggregator(agg_arch='ConvAP', agg_config={}):
         return aggregators.ConvAP(**agg_config)
 
     elif 'boq' in agg_arch.lower():
-        #assert 'in_channels' in agg_config
         return aggregators.BoQ(**agg_config)
 
 

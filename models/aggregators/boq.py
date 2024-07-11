@@ -4,7 +4,7 @@ class BoQBlock(torch.nn.Module):
     def __init__(self, in_dim, num_queries, nheads=8):
         super(BoQBlock, self).__init__()
 
-        self.encoder = torch.nn.TransformerEncoderLayer(d_model=in_dim, nhead=nheads, batch_first=True, dropout=0.)
+        self.encoder = torch.nn.TransformerEncoderLayer(d_model=in_dim, nhead=nheads, dim_feedforward=4*in_dim, batch_first=True, dropout=0.)
         self.queries = torch.nn.Parameter(torch.randn(1, num_queries, in_dim))
 
         # the following two lines are used during training only, you can cache their output in eval.
@@ -41,7 +41,7 @@ class BoQ(torch.nn.Module):
 
         in_dim = proj_channels
         self.boqs = torch.nn.ModuleList([
-            BoQBlock(in_dim, num_queries, nheads=8) for _ in range(num_layers)])
+            BoQBlock(in_dim, num_queries, nheads=in_dim//64) for _ in range(num_layers)])
 
         self.fc = torch.nn.Linear(num_layers*num_queries, row_dim)
 
