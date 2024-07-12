@@ -4,7 +4,7 @@ from torchvision import transforms as T
 
 from dataloaders.train.GSVCitiesDataset import GSVCitiesDataset
 from dataloaders.val.PittsburghDataset import PittsburghDataset
-#from dataloaders.val.MapillaryDataset import MSLS
+from dataloaders.val.MapillaryDataset import MSLS
 #from dataloaders.val.NordlandDataset import NordlandDataset
 #from dataloaders.val.SPEDDataset import SPEDDataset
 
@@ -76,14 +76,14 @@ class GSVCitiesDataModule(pl.LightningDataModule):
         self.save_hyperparameters() # save hyperparameter with Pytorch Lightening
 
         self.train_transform = T.Compose([
-            T.Resize(image_size, interpolation=T.InterpolationMode.BILINEAR),
-            T.RandAugment(num_ops=3, interpolation=T.InterpolationMode.BILINEAR),
+            T.Resize(image_size, interpolation=T.InterpolationMode.BICUBIC),
+            T.RandAugment(num_ops=3, interpolation=T.InterpolationMode.BICUBIC),
             T.ToTensor(),
             T.Normalize(mean=self.mean_dataset, std=self.std_dataset),
         ])
 
         self.valid_transform = T.Compose([
-            T.Resize(image_size, interpolation=T.InterpolationMode.BILINEAR),
+            T.Resize(image_size, interpolation=T.InterpolationMode.BICUBIC),
             T.ToTensor(),
             T.Normalize(mean=self.mean_dataset, std=self.std_dataset)])
 
