@@ -88,9 +88,12 @@ class VPRModel(pl.LightningModule):
                                         weight_decay=self.weight_decay,
                                         momentum=self.momentum)
         elif self.optimizer.lower() == 'adamw':
-            optimizer = torch.optim.AdamW(self.parameters(),
-                                        lr=self.lr,
-                                        weight_decay=self.weight_decay)
+            #elif self.optimizer.lower() == 'adamw':
+            optimizer_params = [
+              {"params": self.backbone.parameters(),  "lr": self.lr*0.2,  "weight_decay" : self.weight_decay},
+              {"params": self.aggregator.parameters(),"lr": self.lr,      "weight_decay" : self.weight_decay},
+            ]
+            optimizer = torch.optim.AdamW(optimizer_params)
         elif self.optimizer.lower() == 'adam':
             optimizer = torch.optim.AdamW(self.parameters(),
                                         lr=self.lr,
@@ -108,7 +111,7 @@ class VPRModel(pl.LightningModule):
         if self.trainer.global_step < self.warmpup_steps:
             lr_scale = min(1., float(self.trainer.global_step + 1) / self.warmpup_steps)
             for pg in optimizer.param_groups:
-                pg['lr'] = lr_scale * self.lr
+                pg['lr'] = lr_scale * pg["initial_lr"]
         optimizer.step(closure=optimizer_closure)
 
     #  The loss function call (this method will be called at each training iteration)
@@ -230,7 +233,7 @@ if __name__ == '__main__':
     # if you want to train on specific cities, you can comment/uncomment
     # cities from the list TRAIN_CITIES
     datamodule = GSVCitiesDataModule(
-        batch_size=160,
+        batch_size=120,
         img_per_place=4,
         min_img_per_place=4,
         # cities=['London', 'Boston', 'Melbourne'], # you can sppecify cities here or in GSVCitiesDataloader.py
@@ -239,7 +242,7 @@ if __name__ == '__main__':
         image_size=(280, 280),
         num_workers=8,
         show_data_stats=True,
-        val_set_names=['pitts30k_val'], # pitts30k_val, pitts30k_test, msls_val, nordland, sped
+        val_set_names=['msls_val'], # pitts30k_val, pitts30k_test, msls_val, nordland, sped
     )
 
     # examples of backbones
@@ -263,9 +266,9 @@ if __name__ == '__main__':
         #
         lr=0.0002, # 0.03 for sgd
         optimizer='adamw', # sgd, adam or adamw
-        weight_decay=0, # 0.001 for sgd or 0.0 for adam
+        weight_decay=0.001, # 0.001 for sgd or 0.0 for adam
         momentum=0.9,
-        warmpup_steps=3790,
+        warmpup_steps=5290,
         milestones=[10, 20, 30],
         lr_mult=0.1,
 
@@ -277,16 +280,16 @@ if __name__ == '__main__':
         #
         loss_name='MultiSimilarityLoss',
         miner_name='MultiSimilarityMiner', # example: TripletMarginMiner, MultiSimilarityMiner, PairMarginMiner
-        miner_margin=0.1,
+        miner_margin=0.05,
         faiss_gpu=False
     )
 
     # model params saving using Pytorch Lightning
     # we save the best 3 models accoring to Recall@1 on pittsburg val
     checkpoint_cb = ModelCheckpoint(
-        monitor='pitts30k_val/R1',
+        monitor='msls_val/R1',
         filename=f'{model.encoder_arch}' +
-        '_epoch({epoch:02d})_step({step:04d})_R1[{pitts30k_val/R1:.4f}]_R5[{pitts30k_val/R5:.4f}]',
+        '_epoch({epoch:02d})_step({step:04d})_R1[{msls_val/R1:.4f}]_R5[{msls_val/R5:.4f}]',
         auto_insert_metric_name=False,
         save_weights_only=True,
         save_top_k=5,
